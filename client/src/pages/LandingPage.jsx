@@ -1,4 +1,3 @@
-import React from 'react';
 import fotoAtas from '../assets/Landing Page/atas.png';
 import fotoBawah from '../assets/Landing Page/bawah.png';
 import { AlarmClock } from 'lucide-react';
@@ -23,24 +22,6 @@ const ScheduleAiLandingPage = () => {
 
       {/* CONTENT LAYER */}
       <div className="relative z-10 flex flex-col min-h-screen">
-
-        {/* NAVIGATION */}
-        <header className="py-6 px-8 flex justify-center">
-          <nav className="bg-gray-800/40 backdrop-blur-md rounded-full p-2 flex space-x-4 border border-gray-600/50">
-            {['Home', 'Tasks', 'Constraints', 'Dashboard'].map((item) => (
-              <a
-                key={item}
-                href={`#${item.toLowerCase()}`}
-                className={`px-4 py-1 text-sm font-medium rounded-full transition-all ${item === 'Home'
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40'
-                    : 'text-gray-300 hover:bg-gray-700/60 hover:text-white'
-                  }`}
-              >
-                {item}
-              </a>
-            ))}
-          </nav>
-        </header>
 
         {/* HERO SECTION */}
         <main className="flex-grow flex flex-col items-center justify-center text-center p-4">

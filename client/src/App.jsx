@@ -1,14 +1,15 @@
-import { useState } from 'react'
-import './App.css'
-import LandingPage from './component/LandingPage.jsx'
+import { Routes, Route } from "react-router-dom";
+import Layout from "./components/Layout.jsx";
+import LandingPage from "./pages/LandingPage.jsx";
+import TasksPage from "./pages/TasksPage.jsx";
 
-function App() {
-
+export default function App() {
   return (
-    <>
-      <LandingPage></LandingPage>
-    </>
-  )
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/tasks" element={<TasksPage />} />
+      </Route>
+    </Routes>
+  );
 }
-
-export default App
