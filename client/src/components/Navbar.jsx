@@ -7,6 +7,7 @@ const Navbar = () => {
     { name: "Home", path: "/" },
     { name: "Tasks", path: "/tasks" },
     { name: "Constraints", path: "/constraints" },
+    { name: "Assistant", path: "/assistant" },
     { name: "Dashboard", path: "/dashboard" },
   ];
 
