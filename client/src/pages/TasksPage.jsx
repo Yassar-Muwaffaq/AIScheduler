@@ -7,9 +7,83 @@ import TaskCard from "../components/TaskCard.jsx";
 
 const API = axios.create({
   baseURL: "http://127.0.0.1:5000/api",
+  // timeout: 5000,
 });
 
-const USER_ID = 1; // TODO: ganti setelah login system jadi ada
+const USER_ID = 1; // TODO: replace when login implemented
+
+// helpers
+function apiTaskToUi(task) {
+  // Backend task model fields (based on models you showed):
+  // - duration_minutes
+  // - deadline_day (YYYY-MM-DD) and deadline_time (HH:MM:SS)
+  // - category (string)
+  // - name, id
+  const ui = {
+    id: task.id,
+    name: task.name,
+    category: task.category || null,
+    category2: task.category2 || null,
+    // duration prefer duration_minutes but fallback to duration
+    duration: task.duration_minutes ?? task.duration ?? null,
+    // combine deadline_day + deadline_time to iso string if present
+    deadline: null,
+    // keep raw for debugging if needed
+    _raw: task,
+  };
+
+  if (task.deadline_day && task.deadline_time) {
+    // ensure time has seconds
+    const time = task.deadline_time.length === 5 ? `${task.deadline_time}:00` : task.deadline_time;
+    ui.deadline = `${task.deadline_day}T${time}`;
+  } else if (task.deadline) {
+    ui.deadline = task.deadline;
+  } else if (task.deadline_iso) {
+    ui.deadline = task.deadline_iso;
+  }
+
+  return ui;
+}
+
+function uiPayloadToApi(payload) {
+  // payload: { user_id, name, duration, deadline, category }
+  const out = {
+    user_id: payload.user_id,
+    name: payload.name,
+    category: payload.category ?? null,
+  };
+
+  // duration -> duration_minutes and mode
+  if (payload.duration) {
+    out.mode = "duration";
+    out.duration_minutes = payload.duration;
+  }
+
+  // deadline (datetime-local string like "2025-11-30T14:00")
+  if (payload.deadline) {
+    // try to parse and split
+    try {
+      const d = new Date(payload.deadline);
+      if (!Number.isNaN(d.getTime())) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mi = String(d.getMinutes()).padStart(2, "0");
+        // backend expects date and time separately
+        out.deadline_day = `${yyyy}-${mm}-${dd}`;
+        out.deadline_time = `${hh}:${mi}:00`;
+      } else {
+        // fallback: send as raw field if parsing failed
+        out.deadline = payload.deadline;
+      }
+    } catch {
+      out.deadline = payload.deadline;
+    }
+  }
+
+  return out;
+}
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState([]);
@@ -21,20 +95,59 @@ export default function TasksPage() {
   const [category, setCategory] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   async function load() {
     setLoading(true);
+    setError(null);
 
     try {
       // === LOAD TASKS ===
       const t = await API.get(`/tasks/${USER_ID}`);
-      setTasks(t.data);
+      // backend returns { tasks: [...] }
+      const rawTasks = t.data && Array.isArray(t.data.tasks) ? t.data.tasks : (Array.isArray(t.data) ? t.data : []);
+      const mapped = rawTasks.map(apiTaskToUi);
+      setTasks(mapped);
+    } catch (err) {
+      console.error("Load error (tasks):", err);
+      setError("Failed to load tasks. See console for details.");
+      setTasks([]);
+    }
 
+    try {
       // === LOAD USER CONSTRAINTS (CATEGORY) ===
       const c = await API.get(`/constraints/user/${USER_ID}`);
-      setCategories(c.data);
+      // backend shape may vary: try multiple keys
+      let raw = [];
+      if (Array.isArray(c.data)) raw = c.data;
+      else if (Array.isArray(c.data.constraints)) raw = c.data.constraints;
+      else if (Array.isArray(c.data.global_constraints)) raw = c.data.global_constraints;
+      else raw = c.data?.items ?? [];
+
+      // if constraint items store value as JSON with .name, extract that
+      const names = raw.map((it) => {
+        if (!it) return null;
+        if (typeof it === "string") return it;
+        if (it.name) return it.name;
+        if (it.value && typeof it.value === "object" && it.value.name) return it.value.name;
+        if (it.value && typeof it.value === "string") {
+          try {
+            const parsed = JSON.parse(it.value);
+            return parsed.name ?? it.value;
+          } catch {
+            return it.value;
+          }
+        }
+        if (it.type) return it.type;
+        return null;
+      }).filter(Boolean);
+
+      // unique
+      setCategories(Array.from(new Set(names)));
     } catch (err) {
-      console.error("Load error:", err);
+      console.error("Load error (constraints):", err);
+      // don't set error here; categories optional
+      setCategories([]);
     }
 
     setLoading(false);
@@ -42,6 +155,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleAdd(e) {
@@ -62,14 +176,47 @@ export default function TasksPage() {
 
     try {
       setLoading(true);
+      setError(null);
 
-      // === CREATE TASK ===
-      const res = await API.post("/tasks/", payload);
-      setTasks((prev) => [res.data, ...prev]);
+      const apiPayload = uiPayloadToApi(payload);
+      const res = await API.post("/tasks/", apiPayload);
+
+      // backend returns created object (may be bare task or wrapped)
+      const created = res.data && res.data.id ? res.data : (res.data.task ?? res.data);
+
+      const uiTask = apiTaskToUi(created);
+      setTasks((prev) => [uiTask, ...prev]);
 
       // reload categories (optional)
-      const catRes = await API.get(`/constraints/user/${USER_ID}`);
-      setCategories(catRes.data);
+      try {
+        const catRes = await API.get(`/constraints/user/${USER_ID}`);
+        let raw = [];
+        if (Array.isArray(catRes.data)) raw = catRes.data;
+        else if (Array.isArray(catRes.data.constraints)) raw = catRes.data.constraints;
+        else if (Array.isArray(catRes.data.global_constraints)) raw = catRes.data.global_constraints;
+        else raw = catRes.data?.items ?? [];
+
+        const names = raw.map((it) => {
+          if (!it) return null;
+          if (typeof it === "string") return it;
+          if (it.name) return it.name;
+          if (it.value && typeof it.value === "object" && it.value.name) return it.value.name;
+          if (it.value && typeof it.value === "string") {
+            try {
+              const parsed = JSON.parse(it.value);
+              return parsed.name ?? it.value;
+            } catch {
+              return it.value;
+            }
+          }
+          if (it.type) return it.type;
+          return null;
+        }).filter(Boolean);
+
+        setCategories(Array.from(new Set(names)));
+      } catch (errCat) {
+        // ignore
+      }
 
       setName("");
       setDuration(null);
@@ -77,6 +224,7 @@ export default function TasksPage() {
       setCategory("");
     } catch (err) {
       console.error("Add task error:", err);
+      setError("Failed to add task. See console for details.");
     }
 
     setLoading(false);
@@ -85,17 +233,34 @@ export default function TasksPage() {
   async function handleDelete(id) {
     try {
       setLoading(true);
+      setError(null);
 
       await API.delete(`/tasks/${id}`);
-
       setTasks((prev) => prev.filter((t) => t.id !== id));
 
-      const catRes = await API.get(`/constraints/user/${USER_ID}`);
-      setCategories(catRes.data);
+      try {
+        const catRes = await API.get(`/constraints/user/${USER_ID}`);
+        let raw = [];
+        if (Array.isArray(catRes.data)) raw = catRes.data;
+        else if (Array.isArray(catRes.data.constraints)) raw = catRes.data.constraints;
+        else raw = catRes.data?.items ?? [];
+
+        const names = raw.map((it) => {
+          if (!it) return null;
+          if (typeof it === "string") return it;
+          if (it.name) return it.name;
+          if (it.value && typeof it.value === "object" && it.value.name) return it.value.name;
+          return null;
+        }).filter(Boolean);
+
+        setCategories(Array.from(new Set(names)));
+      } catch (err) {
+        // ignore
+      }
     } catch (err) {
       console.error("Delete error:", err);
+      setError("Failed to delete task. See console for details.");
     }
-
     setLoading(false);
   }
 
@@ -103,14 +268,38 @@ export default function TasksPage() {
     if (!newCat) return;
 
     try {
-      const res = await API.post("/constraints/task", {
+      // Construct a generic task-constraint payload that backend likely accepts:
+      const payload = {
+        // backend TaskConstraint model had task_id foreign key, but for user-level categories
+        // many backends accept { user_id, type, value, priority }
         user_id: USER_ID,
-        name: newCat,
-      });
+        type: "category",
+        value: { name: newCat },
+        priority: 1,
+      };
 
-      setCategories((prev) => [res.data, ...prev]);
+      const res = await API.post("/constraints/task", payload);
+      // backend may return created constraint
+      let created = res.data;
+      // try to extract name
+      let name = null;
+      if (typeof created === "string") name = created;
+      else if (created.name) name = created.name;
+      else if (created.value && typeof created.value === "object" && created.value.name) name = created.value.name;
+      else if (created.value && typeof created.value === "string") {
+        try {
+          const parsed = JSON.parse(created.value);
+          name = parsed.name ?? newCat;
+        } catch {
+          name = newCat;
+        }
+      } else name = newCat;
+
+      setCategories((prev) => Array.from(new Set([name, ...prev])));
+      return created;
     } catch (err) {
       console.error("Category add error:", err);
+      setError("Failed to add category. See console for details.");
     }
   }
 
@@ -120,6 +309,8 @@ export default function TasksPage() {
         <h1 className="text-6xl md:text-7xl font-dm font-normal mb-12 bg-gradient-to-r from-[#00A6FF] via-[#67CAFF] to-white bg-clip-text text-transparent">
           Tasks
         </h1>
+
+        {error && <div className="mb-6 text-sm text-red-400">{error}</div>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
           <div>
@@ -153,7 +344,7 @@ export default function TasksPage() {
                 value={category}
                 onChange={setCategory}
                 onAddCategory={handleAddCategory}
-                available={categories.map((c) => c.name)}
+                available={categories}
               />
 
               <div className="flex items-center gap-4">
@@ -201,6 +392,7 @@ export default function TasksPage() {
           </div>
         </div>
 
+        {/* FIXED NEXT BUTTON */}
         <button
           className="fixed bottom-6 right-6 px-8 py-3 rounded-xl bg-gradient-to-r from-black to-blue-500 text-white font-semibold shadow-xl"
         >

@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
  * Props:
  *  - value (string or "")
  *  - onChange (fn)
- *  - onAddCategory (fn) -> called when adding new category
+ *  - onAddCategory (fn) -> called when adding new category (should return created item or promise)
  *  - available (array of strings)
  */
 export default function CategorySelector({ value, onChange, onAddCategory, available = [] }) {
@@ -21,9 +21,10 @@ export default function CategorySelector({ value, onChange, onAddCategory, avail
     if (!openAdd) setNewCat("");
   }, [openAdd]);
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!newCat.trim()) return;
-    onAddCategory(newCat.trim());
+    // allow async return
+    const created = await onAddCategory(newCat.trim());
     onChange(newCat.trim());
     setOpenAdd(false);
   }

@@ -5,7 +5,9 @@ export default function TaskCard({ task, onDelete }) {
   const readable = (iso) => {
     if (!iso) return "No deadline";
     try {
+      // if iso already has space like "YYYY-MM-DDTHH:MM:SS"
       const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
       return d.toLocaleDateString("en-US", {
         weekday: "long",
         hour: "2-digit",
@@ -40,7 +42,7 @@ export default function TaskCard({ task, onDelete }) {
 
         <InfoItem
           label="Duration"
-          value={task.duration ? `${task.duration} Minute` : "-"}
+          value={task.duration ? `${task.duration} Minute${task.duration > 1 ? "s" : ""}` : "-"}
         />
 
         <Dot />

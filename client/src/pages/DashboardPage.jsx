@@ -6,23 +6,26 @@ export default function Dashboard({ userId = 1 }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const API_URL = "http://127.0.0.1:5000/api/schedule/day";
+  // BASE URL sesuai backend kamu
+  const API_URL = "http://127.0.0.1:5000";
 
-  // Convert Date → "Monday"
+  // Convert Date → e.g. "Monday"
   const getBackendDay = (date) => {
     return date.toLocaleDateString("en-US", { weekday: "long" });
   };
 
-  // Fetch tasks for chosen day
   const fetchTasks = async () => {
     try {
       setLoading(true);
+
       const dayName = getBackendDay(selectedDate);
 
+      // GET /api/schedule/day/<user_id>/<day>
       const res = await axios.get(`${API_URL}/${userId}/${dayName}`);
+
       setTasks(res.data.schedule || []);
     } catch (err) {
-      console.error(err);
+      console.error("❌ Error fetching schedule:", err);
       setTasks([]);
     } finally {
       setLoading(false);
@@ -33,24 +36,19 @@ export default function Dashboard({ userId = 1 }) {
     fetchTasks();
   }, [selectedDate]);
 
-  // Generate aligned 7-day strip with center focused day
   const getAlignedDays = () => {
     const result = [];
-    const centerIndex = 3; // posisi tengah
-
     for (let i = -3; i <= 3; i++) {
       const d = new Date(selectedDate);
       d.setDate(selectedDate.getDate() + i);
       result.push(d);
     }
-
     return result;
   };
 
   return (
-    <div className="px-6 pt-28"> {/* pt-28 supaya berada di bawah navbar */}
-      
-      {/* DATE HEADER */}
+    <div className="px-6 pt-28">
+
       <div className="mb-6">
         <h1 className="text-3xl font-semibold text-white">
           {selectedDate.toLocaleDateString("en-US", {
@@ -67,16 +65,18 @@ export default function Dashboard({ userId = 1 }) {
 
       {/* DAY SELECTOR */}
       <div className="flex justify-center gap-3 mb-10">
-        {getAlignedDays().map((d) => {
+        {getAlignedDays().map((d, idx) => {
           const active = d.toDateString() === selectedDate.toDateString();
 
           return (
             <button
-              key={d}
+              key={idx}
               onClick={() => setSelectedDate(d)}
-              className={`px-4 py-3 rounded-xl min-w-[85px] text-center transition-all duration-200
-                ${active ? "bg-blue-500 text-white scale-105" : "bg-gray-800 text-gray-300"}
-              `}
+              className={`px-4 py-3 rounded-xl min-w-[85px] text-center transition-all duration-200 ${
+                active
+                  ? "bg-blue-500 text-white scale-105"
+                  : "bg-gray-800 text-gray-300"
+              }`}
             >
               <div className="text-sm font-semibold">
                 {d.toLocaleDateString("en-US", { weekday: "short" })}

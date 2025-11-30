@@ -11,6 +11,10 @@ CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 def home():
     return "API is running!"
 
+@app.route("/api")
+def api():
+    return "API is running!"
+
 
 # ============================
 # AUTH ENDPOINTS
