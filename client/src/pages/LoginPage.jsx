@@ -16,8 +16,8 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      navigate("/dashboard"); // after success
-    } catch {
+      navigate("/dashboard");
+    } catch (error) {
       setErr("Email atau password salah");
     }
   };
@@ -59,7 +59,9 @@ export default function LoginPage() {
 
         <div className="text-center text-gray-400 mt-4">
           Belum punya akun?{" "}
-          <Link to="/register" className="text-blue-400 underline">Register</Link>
+          <Link to="/register" className="text-blue-400 underline">
+            Register
+          </Link>
         </div>
       </div>
     </div>

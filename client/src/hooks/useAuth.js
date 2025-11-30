@@ -8,19 +8,19 @@ export default function useAuth() {
   );
 
   const login = async (email, password) => {
-    const res = await authApi.login({ email, password });
+  const res = await authApi.login({ email, password });
 
-    // backend harus return { token, user_id, name, email }
-    const userData = {
-      token: res.token,
-      userId: res.user_id,
-      name: res.name,
-      email: res.email,
-    };
-
-    localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData);
+  const userData = {
+    token: res.token || "",   // backend kamu mungkin ga ada JWT, bisa kosong
+    userId: res.id || res.user_id || 1, // pastikan user.id ada
+    name: res.name,
+    email: res.email,
   };
+
+  localStorage.setItem("user", JSON.stringify(userData));
+  setUser(userData);
+};
+
 
   const register = async (data) => {
     await authApi.register(data);
