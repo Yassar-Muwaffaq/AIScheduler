@@ -155,7 +155,7 @@ export default function TasksPage() {
             </div>
 
             <div className="mt-6 flex justify-end">
-              <button className="px-8 py-3 rounded-xl bg-gradient-to-r from-blue-700 to-blue-500 text-white font-semibold">
+              <button className="px-8 py-3 rounded-xl bg-gradient-to-r from-black to-blue-500 text-white font-semibold">
                 Next
               </button>
             </div>
